@@ -52,22 +52,21 @@
   <div class="step">
     <div class="idx">第一步</div>
     <h2>登录谷歌账号</h2>
-    <p>用要开的那个号。登录完回来，这个页面会自动识别。</p>
-    <a class="btn" href="https://accounts.google.com/" target="_blank" rel="noopener">去登录</a>
-    <span id="loginState" style="margin-left:12px;font-size:13px;color:#6d768a">未检测</span>
+    <p>用要开的那个号。谷歌不让这个网页读取登录状态，点「去登录」后在谷歌页面里把号选上。点套餐时会再确认一次，结算用的就是这个号。</p>
+    <a class="btn" href="https://accounts.google.com/AccountChooser?continue=https%3A%2F%2Fmyaccount.google.com%2F&amp;hl=zh-CN" target="_blank" rel="noopener">去登录</a>
   </div>
 
   <div class="step">
     <div class="idx">第二步</div>
     <h2>绑一张卡</h2>
     <p>卡里放 1 美元就行，试用期间不扣。已经绑过就跳过。</p>
-    <a class="btn" href="https://pay.google.com/gp/w/u/0/home/paymentmethods" target="_blank" rel="noopener">去绑卡</a>
+    <a class="btn" href="https://accounts.google.com/AccountChooser?continue=https%3A%2F%2Fpay.google.com%2Fgp%2Fw%2Fhome%2Fpaymentmethods&amp;hl=zh-CN" target="_blank" rel="noopener">去绑卡</a>
   </div>
 
   <div class="step">
     <div class="idx">第三步</div>
     <h2>选一个开通</h2>
-    <p>点完会开新标签跳到 Google 结算页，确认金额是 0 再点订阅。</p>
+    <p>点完先确认要用的谷歌账号，再进入结算页。确认金额是 0 再点订阅。</p>
     <div class="plans">
       <div class="plan" data-key="20tb">
         <span class="tag">推荐</span>
@@ -163,8 +162,11 @@ function buildUrl(key, legacy) {
     + "&parent=https%3A%2F%2Fone.google.com&pfname=&rpctoken="
     + (1000000 + Math.floor(Math.random() * 8000000))
     + "&jsh=" + encodeURIComponent("m;/_/scs/abc-static/_/js/k=gapi.lb.zh_CN.O/d=1/rs=AHpOoo/m=__features__");
-  return "https://tokenized.play.google.com/eacquire/multiline?authuser=0&ear="
+  const checkout = "https://tokenized.play.google.com/eacquire/multiline?ear="
     + encodeURIComponent(JSON.stringify(ear)) + gapi;
+  // 不写 authuser=0。账号由谷歌选择页决定，避免一直进第一个号。
+  return "https://accounts.google.com/AccountChooser?continue="
+    + encodeURIComponent(checkout) + "&hl=zh-CN";
 }
 
 /* ---------- 交互 ---------- */
@@ -196,18 +198,6 @@ document.getElementById("copy").addEventListener("click", () => {
   });
 });
 
-/* 顺手探测一下有没有登录过谷歌 */
-(function probe() {
-  const el = document.getElementById("loginState");
-  fetch("https://accounts.google.com/ListAccounts?gpsia=1&source=ChromiumBrowser&json=standard", { credentials: "include" })
-    .then(r => r.json())
-    .then(d => {
-      const n = (d && d[1] && d[1].length) || 0;
-      if (n > 0) el.innerHTML = '<span class="ok">已登录</span>';
-      else el.textContent = "未检测到登录";
-    })
-    .catch(() => { el.textContent = "未检测到登录"; });
-})();
 </script>
 </body>
 </html>

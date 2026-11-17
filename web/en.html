@@ -52,22 +52,21 @@
   <div class="step">
     <div class="idx">STEP 1</div>
     <h2>Sign in to Google</h2>
-    <p>Use the account you want the trial on. Come back when you're done.</p>
-    <a class="btn" href="https://accounts.google.com/" target="_blank" rel="noopener">Sign in</a>
-    <span id="loginState" style="margin-left:12px;font-size:13px;color:#6d768a">not detected</span>
+    <p>Use the account you want the trial on. This page can't read Google's login state. Sign in and pick the account here; choosing a plan asks you to confirm it again, and checkout uses that account.</p>
+    <a class="btn" href="https://accounts.google.com/AccountChooser?continue=https%3A%2F%2Fmyaccount.google.com%2F&amp;hl=en" target="_blank" rel="noopener">Sign in</a>
   </div>
 
   <div class="step">
     <div class="idx">STEP 2</div>
     <h2>Add a payment method</h2>
     <p>A card with $1 on it is enough. Nothing is charged during the trial. Skip if you already have one.</p>
-    <a class="btn" href="https://pay.google.com/gp/w/u/0/home/paymentmethods" target="_blank" rel="noopener">Add card</a>
+    <a class="btn" href="https://accounts.google.com/AccountChooser?continue=https%3A%2F%2Fpay.google.com%2Fgp%2Fw%2Fhome%2Fpaymentmethods&amp;hl=en" target="_blank" rel="noopener">Add card</a>
   </div>
 
   <div class="step">
     <div class="idx">STEP 3</div>
     <h2>Pick a plan</h2>
-    <p>A new tab opens Google Checkout. Confirm the price says $0 before you subscribe.</p>
+    <p>Google asks which account to use, then opens Checkout. Confirm the price says $0 before you subscribe.</p>
     <div class="plans">
       <div class="plan" data-key="20tb">
         <span class="tag">BEST</span>
@@ -163,8 +162,11 @@ function buildUrl(key, legacy) {
     + "&parent=https%3A%2F%2Fone.google.com&pfname=&rpctoken="
     + (1000000 + Math.floor(Math.random() * 8000000))
     + "&jsh=" + encodeURIComponent("m;/_/scs/abc-static/_/js/k=gapi.lb.zh_CN.O/d=1/rs=AHpOoo/m=__features__");
-  return "https://tokenized.play.google.com/eacquire/multiline?authuser=0&ear="
+  const checkout = "https://tokenized.play.google.com/eacquire/multiline?ear="
     + encodeURIComponent(JSON.stringify(ear)) + gapi;
+  // Don't pin authuser=0. AccountChooser selects the account that actually signed in.
+  return "https://accounts.google.com/AccountChooser?continue="
+    + encodeURIComponent(checkout) + "&hl=en";
 }
 
 /* ---------- 交互 ---------- */
@@ -196,18 +198,6 @@ document.getElementById("copy").addEventListener("click", () => {
   });
 });
 
-/* 顺手探测一下有没有登录过谷歌 */
-(function probe() {
-  const el = document.getElementById("loginState");
-  fetch("https://accounts.google.com/ListAccounts?gpsia=1&source=ChromiumBrowser&json=standard", { credentials: "include" })
-    .then(r => r.json())
-    .then(d => {
-      const n = (d && d[1] && d[1].length) || 0;
-      if (n > 0) el.innerHTML = '<span class="ok">signed in</span>';
-      else el.textContent = "not signed in";
-    })
-    .catch(() => { el.textContent = "not signed in"; });
-})();
 </script>
 </body>
 </html>
