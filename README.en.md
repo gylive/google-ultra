@@ -23,17 +23,13 @@ There is also a 30 TB tier (20x). Its offers exist too, but Play re-checks eligi
 
 ## Option A — the web page
 
-Open this, or download `web/index.html` and double-click it:
-
-https://gylive.github.io/google-ultra/web/
+Download `web/index.html` (or `web/en.html` for English) and double-click it.
 
 1. **Sign in** with the Google account you want the trial on
 2. **Add a card** — $1 on it is enough, nothing is charged during the trial
 3. **Pick a plan** — it opens Google's checkout; confirm the price says $0, then subscribe
 
 That's it. No install, no root, no cable.
-
-English page: https://gylive.github.io/google-ultra/web/en.html
 
 ## Option B — the script
 
@@ -101,7 +97,7 @@ Miss either one and checkout says "not eligible". And once a trial has been init
 ## Repo layout
 
 ```
-web/index.html         web tool (Chinese), also served by GitHub Pages
+web/index.html         web tool (Chinese)
 web/en.html            web tool (English)
 simple/ultra.py        minimal script, one file
 ultra0.py              full script: batch, plan selection, account switching

@@ -46,8 +46,6 @@ adb 用 Android SDK 里的 platform-tools。装好后 `adb devices` 能看到手
 
 跳到 Google 的结算页之后，确认金额是 0，点订阅即可。
 
-不想下仓库的话，也可以直接访问在线版：https://gylive.github.io/google-ultra/web/
-
 ### 脚本版怎么用
 
 先自检一遍环境，它会检查设备、root、frida-server、推送计费模块，还会顺手关掉会拦截 Play 网络的代理和 Clash：
@@ -181,14 +179,12 @@ python3 ultra0.py accounts.txt --no-switch
 ## 仓库结构
 
 ```
-web/index.html      简单版：单文件网页，在线版就是它
+web/index.html      简单版：单文件网页
 simple/ultra.py     脚本版极简实现（带内嵌模块）
 simple/README.md    脚本版教程
 ultra0.py           脚本版完整实现（批量、选档、切号）
 assets/             群二维码
 ```
-
-在线版地址：https://gylive.github.io/google-ultra/web/
 
 ## 免责声明与使用条款
 
