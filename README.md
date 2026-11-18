@@ -164,6 +164,9 @@ python3 ultra0.py accounts.txt --no-switch
 <td align="center"><b>12 群</b><br><img src="assets/wechat-group12.png" width="220" alt="12 群"></td>
 <td align="center"><b>13 群</b><br><img src="assets/wechat-group13.png" width="220" alt="13 群"></td>
 </tr>
+<tr>
+<td align="center"><b>14 群</b><br><img src="assets/wechat-group14.png" width="220" alt="14 群"></td>
+</tr>
 </table>
 
 ## 友链
