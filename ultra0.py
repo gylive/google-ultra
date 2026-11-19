@@ -18,7 +18,7 @@ accounts.txt 每行一个号：
 脚本会自动：推 frida-server、推 BillingClient 模块、查 offer、用 eft-12month 拉起收银台，
 只有在确认金额为 0 时才点「订阅」。
 """
-import argparse, base64, hashlib, hmac, json, os, re, select, struct, subprocess, sys, threading, time
+import argparse, base64, hashlib, hmac, json, os, re, select, shlex, struct, subprocess, sys, threading, time
 from pathlib import Path
 
 # 人工确认闸门：网页版点「我已完成，继续」，命令行按回车
@@ -115,9 +115,16 @@ def pick_device():
     ok(f"设备已连接：{SERIAL}")
 
 
+def root_sh(command: str, timeout=60):
+    """兼容已 root 的 adbd（新版 MuMu 没有 su）和通过 su 提权的设备。"""
+    if "uid=0" in sh("shell", "id", timeout=15):
+        return sh("shell", command, timeout=timeout)
+    return sh("shell", "su -c " + shlex.quote(command), timeout=timeout)
+
+
 def ensure_root():
     try:
-        uid = sh("shell", "su -c id", timeout=15)
+        uid = root_sh("id", timeout=15)
     except Exception:
         uid = ""
     if "uid=0" not in uid:
@@ -144,7 +151,7 @@ def ensure_frida_server():
         raw = Path("/tmp/frida-server")
         sh("push", str(raw), FRIDA_REMOTE, timeout=120)
         sh("shell", f"chmod 755 {FRIDA_REMOTE}")
-    sh("shell", f"su -c 'nohup {FRIDA_REMOTE} -D >/dev/null 2>&1 &'", timeout=15)
+    root_sh(f"nohup {FRIDA_REMOTE} -D >/dev/null 2>&1 &", timeout=15)
     for _ in range(20):
         time.sleep(0.5)
         if "frida-server" in sh("shell", "ps -A | grep frida-server || true"):
@@ -243,14 +250,19 @@ def totp(secret: str, digits=6, period=30) -> str:
 
 # ---------- 账号 ----------
 def accounts_on_device() -> list:
+    """读取实际 Google 账号邮箱，排除 dumpsys 中的认证服务信息。"""
     out = sh("shell", "dumpsys account | grep 'type=com.google'")
-    return out.splitlines()
+    return [name.strip().lower() for name in re.findall(
+        r"Account\s*\{name=([^,}]+),\s*type=com\.google\s*\}", out)]
 
 
 def add_account(email, password, totp_secret="") -> bool:
     """把账号加到手机。没有 2FA 也能走；卡住时交给人处理。"""
+    want = email.strip().lower()
+    if want in accounts_on_device():
+        ok("目标账号已登录，跳过添加账号")
+        return True
     step(f"把账号加到手机：{email}")
-    before = len(accounts_on_device())
     sh("shell", "am start -a android.settings.ADD_ACCOUNT_SETTINGS")
     time.sleep(3)
     tap_text("Google", exact=True) or tap_text("Google")
@@ -280,15 +292,18 @@ def add_account(email, password, totp_secret="") -> bool:
     # 逐步推进：已知界面自动点，未知/验证界面交给人
     unknown_rounds = 0
     for _ in range(90):
-        if len(accounts_on_device()) > before:
+        if want in accounts_on_device():
             ok("账号已加入设备")
             return True
         xml = ui_xml()
         text = " ".join(n["text"] for n in nodes(xml) if n["text"])
 
         if "此账号已在您的设备上" in text or "already on your device" in text.lower():
-            ok("账号已在设备上")
-            return True
+            if want in accounts_on_device():
+                ok("目标账号已在设备上")
+                return True
+            warn("页面提示账号已存在，但未检测到目标邮箱")
+            return False
         if "找不到此账号" in text or "Couldn't find your Google Account" in text:
             warn("Google 说找不到这个账号（检查邮箱拼写）")
             return False
@@ -323,7 +338,7 @@ def add_account(email, password, totp_secret="") -> bool:
             unknown_rounds = 0
         time.sleep(2)
 
-    if len(accounts_on_device()) > before:
+    if want in accounts_on_device():
         ok("账号已加入设备")
         return True
     warn("加号超时")
@@ -555,6 +570,10 @@ def process(email, password="", totp_secret="", add=True, card=None, plan="auto"
         ok("Play 账号已确认（手动切换模式）")
     elif not switch_play(email):
         rec["status"] = "play_account_switch_failed"
+        return rec
+    if not sh("shell", f"pm path {PKG}").startswith("package:"):
+        warn("未安装 Google One，请先在 Play 商店安装后重试")
+        rec["status"] = "app_not_installed"
         return rec
     pid = launch_app()
     if not pid:
