@@ -538,7 +538,11 @@ STATUS_CN = {
     "play_account_switch_failed": "切 Play 账号失败，手动切好再重试",
     "app_not_installed": "未安装 Google One，请先在 Play 商店安装后重试",
     "app_not_started": "Google One 已安装但未启动成功，请在模拟器中手动打开检查",
-    "launch_failed": "没查到可用的免费 offer，换个号",
+    "launch_failed": "旧报告未区分技术错误与无优惠，请更新脚本后重试",
+    "injection_failed": "注入或计费调用失败，请查看报告 errors；不能据此判断资格",
+    "query_timeout": "计费查询超时，未收到完整结果；不能据此判断资格",
+    "no_trial": "计费查询完成，未返回可用免费优惠",
+    "billing_launch_failed": "查询后收银台启动失败，请查看报告 launched",
 }
 
 

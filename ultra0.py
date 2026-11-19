@@ -445,28 +445,77 @@ def build_js(plan: str = "auto") -> str:
 def run_trial(pid: int, wait=90, plan="auto") -> dict:
     import frida
     step("注入计费模块，查询免费试用")
-    dev = frida.get_usb_device(timeout=10)
-    sess = dev.attach(pid)
-    res = {"offers": [], "launched": None, "purchase": None, "errors": []}
+    res = {"offers": [], "launched": None, "purchase": None, "errors": [],
+           "events": [], "no_trial": False, "timed_out": False}
+    done = threading.Event()
+    lock = threading.Lock()
+    active = True
+    sess = sc = None
 
     def on_msg(m, _):
+        nonlocal active
+        with lock:
+            if active:
+                record_message(m)
+
+    def record_message(m):
+        if m.get("type") == "error":
+            res["errors"].append({"ev": "frida_error", "m": m.get("description", ""),
+                                  "stack": m.get("stack", "")})
+            done.set()
+            return
         p = m.get("payload") or {}
+        if not isinstance(p, dict):
+            return
         ev = p.get("ev")
+        if ev:
+            res["events"].append(p)
         if ev == "offer":
             res["offers"].append(p)
             note(f"offer {p.get('id')} → {p.get('micros')} ({p.get('p0','')})")
         elif ev == "launched":
             res["launched"] = p
             ok(f"已拉起收银台：{p}")
+            done.set()
         elif ev == "purchase_cb":
             res["purchase"] = p
-        elif ev and ("err" in ev or ev.startswith("no_")):
+        elif ev == "no_trial":
+            res["no_trial"] = True
+            done.set()
+        elif ev in ("setup", "pd") and p.get("code") != 0:
             res["errors"].append(p)
+            done.set()
+        elif ev == "disc" or (ev and ("err" in ev or ev == "no_activity")):
+            res["errors"].append(p)
+            done.set()
 
-    sc = sess.create_script(build_js(plan))
-    sc.on("message", on_msg)
-    sc.load()
-    time.sleep(wait)
+    try:
+        source = build_js(plan)
+        if int(frida.__version__.split(".")[0]) >= 17:
+            bridge = Path(__file__).resolve().parent / "assets" / "frida" / "java-bridge.js"
+            source = bridge.read_text(encoding="utf-8") + "\n" + source
+        dev = frida.get_usb_device(timeout=10)
+        sess = dev.attach(pid)
+        sc = sess.create_script(source)
+        sc.on("message", on_msg)
+        sc.load()
+        done.wait(wait)
+        with lock:
+            active = False
+            res["timed_out"] = not done.is_set()
+    except Exception as e:
+        with lock:
+            active = False
+            res["errors"].append({"ev": "injection_error", "m": str(e)})
+    finally:
+        with lock:
+            active = False
+        for resource, method in ((sc, "unload"), (sess, "detach")):
+            if resource is not None:
+                try:
+                    getattr(resource, method)()
+                except Exception as e:
+                    res["errors"].append({"ev": "cleanup_error", "m": str(e)})
     return res
 
 
@@ -585,8 +634,14 @@ def process(email, password="", totp_secret="", add=True, card=None, plan="auto"
         rec["sheet"] = confirm_zero(password=password)
         rec["subscription_page"] = verify()
         rec["status"] = "subscribed" if "Ultra" in rec["subscription_page"] else "launched"
+    elif fr["errors"]:
+        rec["status"] = "injection_failed"
+    elif fr.get("no_trial"):
+        rec["status"] = "no_trial"
+    elif fr.get("timed_out"):
+        rec["status"] = "query_timeout"
     else:
-        rec["status"] = "launch_failed"
+        rec["status"] = "billing_launch_failed"
     return rec
 
 
@@ -760,7 +815,8 @@ function query(){
   var PL=Java.registerClass({name:"rc.C"+Date.now(), implements:[PDL], methods:{
     onProductDetailsResponse:function(res,list){
       S({ev:"pd", code:res.getResponseCode(), n:(list?list.size():0)});
-      if(res.getResponseCode()!==0 || !list || list.size()===0) return;
+      if(res.getResponseCode()!==0) return;
+      if(!list || list.size()===0){ S({ev:"no_trial", reason:"no_products"}); return; }
       L(dexLoader);
       var PD=Java.use("com.android.billingclient.api.ProductDetails");
       var SOD=Java.use("com.android.billingclient.api.ProductDetails$SubscriptionOfferDetails");
@@ -826,7 +882,7 @@ function launch(pd, offer){
   Handler.$new(Looper.getMainLooper()).post(R.$new());
  }catch(e){ S({ev:"launch_outer_err", m:String(e).slice(0,200)}); }
 }
-var iv=setInterval(function(){ try{ L(null); var a=Java.use("android.app.ActivityThread").currentApplication(); if(a){clearInterval(iv); boot();} }catch(e){} },400);
+var iv=setInterval(function(){ try{ L(null); var a=Java.use("android.app.ActivityThread").currentApplication(); if(a){clearInterval(iv); boot();} }catch(e){clearInterval(iv); S({ev:"boot_err", m:String(e).slice(0,200)});} },400);
 
 '''
 
